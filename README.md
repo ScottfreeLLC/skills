@@ -13,8 +13,8 @@ A collection of [Agent Skills](https://agentskills.io/specification) for Claude 
 ### Claude Code Plugin
 
 ```bash
-/plugin marketplace add <your-repo-url>
-/plugin install ai-engineer@conway-agent-skills
+/plugin marketplace add ScottfreeLLC/skills
+/plugin install ai-engineer@scottfree-skills
 ```
 
 ### Manual

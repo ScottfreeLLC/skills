@@ -1,9 +1,9 @@
 {
   "project": {
-    "name": "conway-agent-skills",
+    "name": "scottfree-skills",
     "version": "1.0.0",
     "author": {
-      "name": "Mark Conway"
+      "name": "Scottfree Analytics LLC"
     }
   },
   "plugins": [
