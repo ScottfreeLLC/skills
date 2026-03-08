@@ -6,7 +6,7 @@ A collection of [Agent Skills](https://agentskills.io/specification) for Claude 
 
 | Skill | Description |
 |---|---|
-| [ai-engineer](ai-engineer/) | Senior-level AI engineering standards for retrieval, agents, evals, context engineering, and production AI systems |
+| [ai-engineer](skills/ai-engineer/) | Senior-level AI engineering standards for retrieval, agents, evals, context engineering, and production AI systems |
 
 ## Installation
 
@@ -23,7 +23,7 @@ Copy the skill directory into your project or Claude Code skills path.
 
 ## Creating a New Skill
 
-1. Copy the `template/` directory and rename it
+1. Copy the `template/` directory into `skills/` and rename it
 2. Edit `SKILL.md` — update the frontmatter (`name`, `description`) and body
 3. Add `references/` for detailed docs that should load on-demand
 4. Add `scripts/` for executable code if needed

@@ -11,7 +11,7 @@
       "name": "ai-engineer",
       "description": "Senior-level AI engineering standards for retrieval, agents, evals, context engineering, and production AI systems.",
       "strict": false,
-      "skills": ["ai-engineer"]
+      "skills": ["skills/ai-engineer"]
     }
   ]
 }

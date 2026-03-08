@@ -6,6 +6,7 @@ set -euo pipefail
 #   If no skill name given, builds all skills.
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+SKILLS_DIR="$REPO_ROOT/skills"
 DIST_DIR="$REPO_ROOT/dist"
 mkdir -p "$DIST_DIR"
 
@@ -20,16 +21,14 @@ build_skill() {
     fi
 
     local out="$DIST_DIR/$skill_name.skill"
-    (cd "$REPO_ROOT" && zip -r -q "$out" "$skill_name/")
+    (cd "$SKILLS_DIR" && zip -r -q "$out" "$skill_name/")
     echo "BUILT: $out"
 }
 
 if [[ $# -gt 0 ]]; then
-    build_skill "$REPO_ROOT/$1"
+    build_skill "$SKILLS_DIR/$1"
 else
-    for dir in "$REPO_ROOT"/*/; do
-        dir_name="$(basename "$dir")"
-        [[ "$dir_name" == "template" || "$dir_name" == "scripts" || "$dir_name" == "dist" || "$dir_name" == ".claude-plugin" ]] && continue
+    for dir in "$SKILLS_DIR"/*/; do
         build_skill "$dir"
     done
 fi
