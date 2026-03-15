@@ -5,7 +5,9 @@ description: >
   or reviewing retrieval/RAG systems, embedding pipelines, LLM integrations,
   agentic workflows, prompt and context engineering, evals, LLM observability,
   MCP tools, fine-tuning decisions, classical NLP/text-processing code, or
-  applied ML/data workflows that feed AI products.
+  applied ML/data workflows that feed AI products. Use when user asks to
+  "build a search system", "add RAG", "create an agent", "set up tracing",
+  "build an embedding pipeline", "add evals", or "fine-tune a model".
 
   Trigger before writing "naive" AI code: ad-hoc prompt strings, vector-only
   retrieval by default, unbounded agent loops, missing eval plans, missing
@@ -14,6 +16,10 @@ description: >
 
   Do NOT trigger for general scripting, frontend work, web APIs unrelated to
   AI/ML, DevOps/CI/CD unrelated to LLMOps, or pure infrastructure work.
+license: Apache-2.0
+metadata:
+  author: ScottfreeLLC
+  version: 1.0.0
 ---
 
 # AI Engineer
@@ -438,3 +444,81 @@ Example:
 | `references/nlp-and-data-workflows.md` | Text preprocessing, corpus audits, and exploratory analysis for AI systems |
 | `references/ai-system-checklists.md` | Running design reviews, launch gates, and incident follow-up loops |
 | `references/exemplar-repos.md` | Studying strong public implementations before copying a pattern |
+
+---
+
+## Examples
+
+### Example 1: Build a semantic search pipeline
+
+User says: "I need to add search to our docs so users can find relevant articles"
+
+1. **Classify**: Retrieval / semantic search
+2. **Load**: `references/building-semantic-search.md`
+3. **Decision record**:
+   - Hybrid retrieval (dense + BM25) over vector-only — keyword matches matter for docs
+   - Reranker before LLM — filter irrelevant results
+   - Eval: recall@10 on a hand-labeled query set before shipping
+   - Drift risk: embedding model version mismatch between ingestion and query
+4. **Implement**: Separate ingestion pipeline and stateless query API, hash-based skip for unchanged docs
+
+Result: Production-ready search with eval baseline, hybrid retrieval, and reranking.
+
+### Example 2: Add an agent workflow
+
+User says: "Build me an agent that can research a topic and write a report"
+
+1. **Classify**: Agentic workflow
+2. **Load**: `references/agentic-patterns.md`, `references/context-engineering.md`
+3. **Decision record**:
+   - Could prompt chaining (research → outline → draft) work without an agent? Try that first
+   - If agent needed: typed state with `TypedDict`, `max_steps=15`, tool errors feed back into context with 3-strike escalation
+   - Eval: track step success rate, tool accuracy, completion rate
+   - Context: each step sees only its relevant slice, not the full conversation
+4. **Implement**: Start with prompt chain; escalate to LangGraph only if branching or recovery is needed
+
+Result: Simplest viable architecture with bounded loops and per-step observability.
+
+### Example 3: Review existing RAG code
+
+User says: "Can you review this retrieval pipeline?"
+
+1. **Classify**: Review mode — retrieval
+2. **Load**: `references/building-semantic-search.md`, `references/eval-and-observability.md`
+3. **Check for anti-patterns**:
+   - Vector-only retrieval? → Recommend hybrid
+   - No reranking? → "Table stakes in production — add a cross-encoder"
+   - No relevance threshold? → "Irrelevant context actively degrades LLM output"
+   - Same embedding model for ingestion and query? → Flag if mismatched
+   - Any eval suite? → If missing, flag as the highest-priority gap
+4. **Report**: Name each anti-pattern, explain the failure mode, suggest the smallest fix
+
+Result: Actionable review with prioritized fixes tied to real production risks.
+
+---
+
+## Common Issues
+
+### Skill loads too many references at once
+
+**Cause:** Task spans multiple domains or classification is too broad.
+
+**Fix:** Be specific in step 1 (Classify). If the task is "build a RAG-powered agent," classify as retrieval first, get that working, then layer in the agent pattern. Don't load all references at once.
+
+### Volatile information is stale
+
+**Cause:** Model rankings, library APIs, or SDK imports have changed since training.
+
+**Fix:** Follow the Volatile Information Policy — stop, check official docs or MTEB leaderboard, note what you found, then write code. When in doubt, add a comment: `# Verified against MTEB as of YYYY-MM-DD`.
+
+### Conflicting guidance between references
+
+**Cause:** Different references optimize for different concerns (e.g., simplicity vs. observability).
+
+**Fix:** The Core Principles are the tiebreaker. Principle 1 (simplest thing that works) wins unless there's a specific production requirement that demands more complexity. Document the tradeoff in the decision record.
+
+### Skill triggers when it shouldn't
+
+**Symptom:** Skill activates for general Python scripting or web API work unrelated to AI/ML.
+
+**Fix:** The description includes explicit negative triggers. If this still happens, check whether the user's request mentions AI-adjacent terms (e.g., "model" in a non-ML context). The skill should not activate unless the task genuinely involves AI/ML systems.
