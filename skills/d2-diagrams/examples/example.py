@@ -27,7 +27,7 @@ SIDE = {
 
 
 def orders(direction):
-    return spine(MAIN, SIDE, direction, carries=CARRIES)
+    return spine(MAIN, SIDE, direction, carries=CARRIES, side_cls="flow")   # one arrow style in a data flow
 
 
 # --- 2. A state machine: read it from the code, never retype it. (from, to): what triggers the move.
@@ -44,7 +44,7 @@ def states(direction):
     lines.append(initial(start))
     lines += [final_marker(s) for s in ends]
     # every transition carries its trigger: in a state machine the triggers are the events
-    lines += [link(a, b, trigger, "dashed" if trigger.startswith("timer") else "flow") for (a, b), trigger in TRANSITIONS.items()]
+    lines += [link(a, b, trigger) for (a, b), trigger in TRANSITIONS.items()]
     return "\n".join(lines)
 
 
@@ -55,11 +55,11 @@ if __name__ == "__main__":
             "title": "What data moves when an order is placed?", "notation": "dataflow",
             "key": [("external", "person or system outside ours"), ("process", "service or job"),
                     ("queue", "queue (convention)"), ("store", "stored data")],
-            "arrows": [("flow", "data on the main path"), ("warn", "data leaving the main path")]}),
+            "arrows": [("flow", "data, named on the arrow")]}),
         "2-states": (states, ("down", "right"), {
             "title": "How an article gets published", "notation": "state",
             "engine": "dagre",   # graphs with loops: curved arrows, even spacing
             "key": [("initial", "where an article starts"), ("state", "state"), ("end", "where it stops")],
-            "arrows": [("flow", "a person triggers the move"), ("dashed", "a timer triggers the move")]}),
+            "arrows": [("flow", "a move, labelled with what triggers it")]}),
     }, out)
     sys.exit(0 if ok else 1)

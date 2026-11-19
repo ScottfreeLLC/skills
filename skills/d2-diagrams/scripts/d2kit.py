@@ -79,15 +79,19 @@ MARKERS = ("initial", "end")   # UML pseudostates, drawn by initial() and final_
 
 # The standard each notation follows, the kinds it has, and what build() checks.
 PROFILES = {
+# "arrows": the connector styles a notation has. Flowcharts, data flows and UML state machines draw
+# every connector the same way: what an arrow carries goes in its label, not in its colour or weight.
     "flowchart": {"standard": "ISO 5807 / ANSI X3.5 flowchart", "title": "Flowchart: ",
-                  "kinds": {"terminator", "process", "decision", "io", "doc", "store"}, "label_all": False},
+                  "kinds": {"terminator", "process", "decision", "io", "doc", "store"}, "label_all": False,
+                  "arrows": {"flow"}},
     "dataflow": {"standard": "data-flow diagram (Yourdon/DeMarco, Gane & Sarson)", "title": "Data flow: ",
                  "kinds": {"process", "store", "queue", "doc", "external", "person"}, "label_all": True,
-                 "max_process": 6},
+                 "max_process": 6, "arrows": {"flow"}},
     "state": {"standard": "UML 2.5.1 state machine", "title": "State machine: ",
-              "kinds": {"state", "decision", "initial", "end"}, "label_all": True},
+              "kinds": {"state", "decision", "initial", "end"}, "label_all": True, "arrows": {"flow"}},
     "c4": {"standard": "C4 model (system context / container)", "title": "",
-           "kinds": {"person", "external", "process", "store", "queue"}, "label_all": True},
+           "kinds": {"person", "external", "process", "store", "queue"}, "label_all": True,
+           "arrows": {"flow", "dashed"}},   # C4 allows line styles that the key explains, e.g. dashed = async
 }
 TONES = ("focus", "risk", "hold", "good", "check", "out")
 # D2 keywords that cannot be used as ids ("link" bit us once).
@@ -205,7 +209,7 @@ def grid(columns, *cells, h_gap=70, v_gap=50):
     return "\n".join([f"grid-columns: {columns}", f"horizontal-gap: {h_gap}", f"vertical-gap: {v_gap}", *cells])
 
 
-def spine(main, side=None, direction="down", carries=None, side_cls="warn", gap=None):
+def spine(main, side=None, direction="down", carries=None, side_cls="flow", gap=None):
     """A main path drawn as one straight line, with exceptions hanging off the step that causes them.
 
     main: [(id, title, sub, cls), ...] in order, joined by arrows.
@@ -252,7 +256,7 @@ def title_block(title, subtitle=None, size=20):
     return f"d2kit_title: {q(text)} {{shape: text; near: top-center; style.font-size: {size}; style.bold: true}}"
 
 
-EDGE_SAMPLES = {"flow": ("——▶", "out"), "warn": ("——▶", "risk"), "strong": ("━━▶", "step"), "accent": ("━━▶", "focus"),
+EDGE_SAMPLES = {"flow": ("────▶", "out"), "warn": ("────▶", "risk"), "strong": ("━━▶", "step"), "accent": ("━━▶", "focus"),
                 "dashed": ("- - ▶", "check"), "ref": ("· · ▶", "store")}
 
 
@@ -351,7 +355,7 @@ def _extras(opts, key_at, per_row, palette):
 
 def check_notation(body, notation):
     """Check generated D2 against a notation profile. Returns (errors, warnings).
-    Errors: a shape the notation does not have. Warnings: unlabelled arrows where the notation
+    Errors: a shape or arrow style the notation does not have. Warnings: unlabelled arrows where the notation
     labels every one, and more processes on one data-flow diagram than a reader can hold."""
     prof = PROFILES[notation]
     used, processes, errors, warnings = {}, 0, [], []
@@ -372,6 +376,16 @@ def check_notation(body, notation):
         if kind not in prof["kinds"]:
             errors.append(f"'{kind}' (e.g. {example}) is not part of a {prof['standard']}; "
                           f"use one of: {', '.join(sorted(prof['kinds']))}")
+    styles = {}
+    for ln in lines:
+        m = re.search(r"->.*class: ([\w-]+)", ln)
+        if m:
+            styles.setdefault(m.group(1), ln.split(":")[0].strip())
+    for style, example in styles.items():
+        if style not in prof["arrows"]:
+            errors.append(f"arrow style '{style}' (e.g. {example}) is not part of a {prof['standard']}, which draws "
+                          f"every connector alike; use {' or '.join(sorted(prof['arrows']))} and say what is "
+                          "special in the label"),
     if prof.get("label_all"):
         bare = [ln.strip() for ln in lines if re.search(r"->\s*[\w.]+\s*:\s*\{", ln)
                 and "opacity: 0" not in ln and "d2kit_start" not in ln and "d2kit_end" not in ln]

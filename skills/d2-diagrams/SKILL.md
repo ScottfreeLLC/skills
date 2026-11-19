@@ -82,14 +82,14 @@ def flow(direction):
         node("api", "Order API", "validates the order", "process"),
         node("db", "Orders", "Postgres", "store"),
         link("shop", "api", "order request"), link("api", "db", "valid order"),
-        link("api", "shop", "refusal reason", "warn"),
+        link("api", "shop", "refusal reason"),
     ])
 
 build({"1-flow": (flow, ("down", "right"), {
     "notation": "dataflow",                                # the standard this diagram follows
     "title": "How an order is saved",                      # becomes "Data flow: How an order is saved"
     "key": [("external", "system outside ours"), ("process", "our code"), ("store", "stored data")],
-    "arrows": [("flow", "data on the main path"), ("warn", "data sent back")],
+    "arrows": [("flow", "data, named on the arrow")],
 })}, out_dir="docs/diagrams")
 ```
 
@@ -167,12 +167,15 @@ only one shape, data and outside parties have probably been folded into process 
 The key explains every shape, status colour, border and arrow style the diagram uses, because a
 convention only helps readers who can check it. In `key`, list each kind once with a plain-words
 label ("Kafka topic", "service or job"), then each status. In `arrows`, list each arrow style used
-(`[("flow", "moved by support staff"), ("dashed", "automatic timer")]`). The kit draws it as one
-boxed legend with a small sample beside each line.
+(`[("flow", "data, named on the arrow")]`). The kit draws it as one boxed legend with a small
+sample beside each line.
 
-Arrow classes: `flow` (default), `warn` (leaves the main path), `ref` (lookup, dotted), `strong`
-(the link that matters), `dashed` (automatic, timed, or optional), `accent` (a second actor). Pass
-`palette=` to `build` to match a project's colours.
+**Connectors are consistent.** Flowcharts, data flows and UML state machines draw every connector
+the same way, so under those notations the build fails on any arrow style but `flow`. What makes an
+arrow special (the important one, a timer, an error path) goes in its label, never in its colour or
+thickness. C4 allows `dashed` as well, for a second kind of relationship such as asynchronous
+messages, as long as the key explains it. The other styles (`warn`, `ref`, `strong`, `accent`) are
+for diagrams that use no `notation`. Pass `palette=` to `build` to match a project's colours.
 
 ### The main path
 
