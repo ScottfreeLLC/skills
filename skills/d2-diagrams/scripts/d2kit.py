@@ -243,13 +243,13 @@ def spine(main, side=None, direction="down", carries=None, side_cls="warn", gap=
     return "\n".join(out)
 
 
-def title_block(title, subtitle=None):
+def title_block(title, subtitle=None, size=20):
     """A heading inside the image, for a diagram that will be pasted somewhere on its own."""
     if MARKDOWN:
         text = f"**{title}**" + (f"  \n{subtitle}" if subtitle else "")
-        return f"d2kit_title: |md\n{text}\n| {{near: top-center; style.font-size: 20}}"
+        return f"d2kit_title: |md\n{text}\n| {{near: top-center; style.font-size: {size}}}"
     text = title + (f"\n{subtitle}" if subtitle else "")
-    return f"d2kit_title: {q(text)} {{shape: text; near: top-center; style.font-size: 20; style.bold: true}}"
+    return f"d2kit_title: {q(text)} {{shape: text; near: top-center; style.font-size: {size}; style.bold: true}}"
 
 
 EDGE_SAMPLES = {"flow": ("——▶", "out"), "warn": ("——▶", "risk"), "strong": ("━━▶", "step"), "accent": ("━━▶", "focus"),
@@ -343,7 +343,7 @@ def _spec(entry):
 def _extras(opts, key_at, per_row, palette):
     extra = []
     if opts.get("title"):
-        extra.append(title_block(opts["title"], opts.get("subtitle")))
+        extra.append(title_block(opts["title"], opts.get("subtitle"), opts.get("title_size", 20)))
     if opts.get("key") or opts.get("arrows") or opts.get("note"):
         extra.append(key_block(opts.get("key") or [], opts.get("arrows"), opts.get("note"), key_at, per_row, palette))
     return "\n" + "\n".join(extra)
@@ -400,6 +400,7 @@ def build(diagrams, out_dir, src_dir=None, page_width=1180, names=None, palette=
     rest, the one that takes the least height is kept.
     options:
       "title", "subtitle"  a heading inside the image, for diagrams that will stand alone
+      "title_size"         its font size (default 20; about 32 for a slide)
       "key": [(class, text), ...], "arrows": [(link class, text), ...], "note": "..."
                            a boxed legend; it goes beside a tall diagram and below a wide one
       "key_at": "right" | "below"   overrides that choice
