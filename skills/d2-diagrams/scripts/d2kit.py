@@ -263,36 +263,55 @@ def key_block(items, arrows=None, note=None, at="below", per_row=3, palette=None
     arrows: [(link class, text), ...] e.g. [("warn", "leaves the main path"), ("dashed", "timer")].
     note:   one more line of plain text, if something does not fit either list.
     at:     "right" stacks the entries in one column beside the diagram (for tall diagrams);
-            "below" lays them out per_row to a row under it (for wide ones). build() picks."""
+            "below" lays them out per_row to a row under it (for wide ones). build() picks.
+    Cells in a grid row share a height, and D2 will not draw a cylinder shorter than about 58 px,
+    so flat samples go on rows of their own, then tall ones, then the arrows: nothing gets stretched."""
     p = {**PALETTE, **(palette or {})}
-    cells = []
-    for n, (cls, text) in enumerate(items):
+
+    def glyph(text, size, colour="#000000", h=34, bold=False):  # a clear box keeps its text centred
+        return (f'{q(text)} {{width: 56; height: {h}; style: {{fill: transparent; stroke-width: 0; font-size: {size}; '
+                f'bold: {str(bold).lower()}; font-color: "{colour}"}}}}', h)
+
+    flat, tall, lines = [], [], []
+    for cls, text in items:
         words = [ALIASES.get(w, w) for w in cls.split()]
         kind = next((w for w in words if w in KINDS), "process")
-        # D2 draws a cylinder's lid at a fixed size, so below these sizes it turns into a blob
-        w, h = {"store": (50, 58), "queue": (84, 34), "doc": (46, 30), "io": (50, 26)}.get(kind, (56, 34))
         marker = next((w for w in words if w in MARKERS), None)
-        if marker:  # a grid cell stretches a shape to the column width, so draw the markers as glyphs
-            glyph, size = {"initial": ("●", 20), "end": ("◉", 24)}[marker]
-            cells += [f'  s{n}: "{glyph}" {{shape: text; style: {{font-size: {size}; font-color: "#000000"}}}}', (n, text)]
-            continue
-        size = f"width: {w}; height: {h}"
-        if kind == "person":  # D2's person shape has a minimum width, so a grid cell turns it into a blob
-            cells += [f'  s{n}: "👤" {{shape: text; style: {{font-size: 22}}}}', (n, text)]
-            continue
-        cells += [f'  s{n}: "" {{class: {_cls(cls)}; {size}; style.stroke-width: 1}}', (n, text)]
-    for n, (cls, text) in enumerate(arrows or []):
-        glyph, colour = EDGE_SAMPLES.get(cls, EDGE_SAMPLES["flow"])
-        cells += [f'  a{n}: {q(glyph)} {{shape: text; style: {{font-size: 13; bold: true; font-color: "{p[colour][1]}"}}}}', (f"a{n}", text)]
+        if marker:  # markers and people are drawn as glyphs: as shapes a grid cell would stretch them
+            flat.append((*glyph(*{"initial": ("●", 20), "end": ("◉", 24)}[marker]), text))
+        elif kind == "person":
+            flat.append((*glyph("👤", 22), text))
+        else:
+            # D2 draws a cylinder's lid at a fixed size, so below these sizes it turns into a blob
+            w, h = {"store": (50, 58), "queue": (84, 34), "doc": (46, 30), "io": (50, 26)}.get(kind, (56, 34))
+            (tall if kind == "store" else flat).append(
+                (f'"" {{class: {_cls(cls)}; width: {w}; height: {h}; style.stroke-width: 1}}', h, text))
+    for cls, text in arrows or []:
+        g, colour = EDGE_SAMPLES.get(cls, EDGE_SAMPLES["flow"])
+        lines.append((*glyph(g, 14, p[colour][1], 26, True), text))
+    per_row = 1 if at == "right" else max(1, min(per_row, max(len(flat), len(tall), len(lines), 1)))
+    entries = []
+    for run in (flat, tall, lines):  # each run starts on a fresh row
+        if run:
+            entries += run + [None] * (-len(run) % per_row)
     if note:
-        cells += ['  n0: "" {class: blank; width: 1; height: 1}', ("n", note)]
-    cells = [c if isinstance(c, str) else f"  t{c[0]}: {q(c[1])} {{shape: text; style: {{font-size: 13; font-color: \"#000000\"}}}}" for c in cells]
-    entries = len(cells) // 2
-    per_row = 1 if at == "right" else max(1, min(per_row, entries))
+        entries += [("", 26, note)] + [None] * (per_row - 1)
+    cols = 3 * per_row - 1   # sample, text, and a spacer between entries
+    cells = []
+    for n, e in enumerate(entries):
+        if n % per_row:
+            cells.append(f'  g{n}: "" {{class: blank; width: 28; height: 1}}')
+        if e is None:
+            cells += [f'  s{n}: "" {{class: blank; width: 1; height: 1}}', f'  t{n}: "" {{class: blank; width: 1; height: 1}}']
+            continue
+        sample, h, text = e
+        cells.append(f"  s{n}: {sample}" if sample else f'  s{n}: "" {{class: blank; width: 1; height: 1}}')
+        cells.append(f'  t{n}: {q(text)} {{width: {int(7.4 * len(text)) + 16}; height: {h}; label.near: center-left; '
+                     f'style: {{fill: transparent; stroke-width: 0; font-size: 14; bold: false; font-color: "#000000"}}}}')
     return "\n".join([
         'd2kit_key: "Key" {', f"  near: {'center-right' if at == 'right' else 'bottom-center'}", "  label.near: top-left",
         '  style: {fill: "#FFFFFF"; stroke: "#9AA5B1"; stroke-width: 1; border-radius: 6; font-size: 13; bold: true; font-color: "#4A5560"}',
-        f"  grid-rows: {-(-entries // per_row)}", f"  grid-columns: {2 * per_row}", "  horizontal-gap: 8", "  vertical-gap: 6",
+        f"  grid-rows: {len(entries) // per_row}", f"  grid-columns: {cols}", "  horizontal-gap: 12", "  vertical-gap: 10",
         *cells, "}"])
 
 
