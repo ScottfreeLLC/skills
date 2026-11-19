@@ -30,9 +30,10 @@ QUESTIONS = {
     "big": ("Refund of more", "than 100.00?", lambda c: c["amount"] > 100, "review:amount over 100.00", "approve:small amount"),
 }
 START = "late"
-# Flowchart convention: the start and each end are ovals, each question is a diamond.
-OUTCOMES = {"approve": ("Approved automatically", "event good"), "review": ("Sent to a person", "event hold"),
-            "reject": ("Refused", "event risk")}
+# ISO 5807 flowchart: the start and each end are terminators (boxes with rounded ends), each
+# question is a diamond with yes / no exits. Colour (good / hold / risk) is our own extension.
+OUTCOMES = {"approve": ("Approved automatically", "terminator good"), "review": ("Sent to a person", "terminator hold"),
+            "reject": ("Refused", "terminator risk")}
 
 
 def walk(case):
@@ -51,7 +52,7 @@ def check():
 
 
 def flow(direction):
-    lines = [f"direction: {direction}", node("start", "Refund request", None, "event"), link("start", START)]
+    lines = [f"direction: {direction}", node("start", "Refund request", None, "terminator"), link("start", START)]
     n = 0
     for qid, (question, sub, _, yes, no) in QUESTIONS.items():
         lines.append(node(qid, question, sub, "decision"))
@@ -69,6 +70,6 @@ def flow(direction):
 if __name__ == "__main__":
     print(f"checked {check()} cases against the function")
     out = sys.argv[1] if len(sys.argv) > 1 else "diagrams"
-    opts = {"title": "When is a refund approved?",
-            "key": [("event", "start"), ("decision", "yes / no question"), *[(c, t) for t, c in OUTCOMES.values()]]}
+    opts = {"title": "When is a refund approved?", "notation": "flowchart",
+            "key": [("terminator", "start"), ("decision", "yes / no question"), *[(c, t) for t, c in OUTCOMES.values()]]}
     sys.exit(0 if build({"refund-flow": (flow, ("down",), opts)}, out) else 1)

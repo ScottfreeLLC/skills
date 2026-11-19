@@ -3,7 +3,7 @@
 Import this from a small build script kept next to the diagrams:
 
     import sys; sys.path.insert(0, "<skill>/scripts")
-    from d2kit import node, plain, link, group, grid, spine, initial, build
+    from d2kit import node, plain, link, group, grid, spine, initial, final_marker, build
 
     def flow(direction):
         return "\n".join([f"direction: {direction}",
@@ -11,11 +11,15 @@ Import this from a small build script kept next to the diagrams:
                           node("db", "Orders", "Postgres", "store"),
                           link("api", "db", "write")])
 
-    build({"1-flow": (flow, ("down", "right"))}, out_dir="docs/diagrams")
+    build({"1-flow": (flow, ("down", "right"), {"notation": "dataflow"})}, out_dir="docs/diagrams")
 
 A node's class is its kind (which sets the shape) plus, optionally, its status (which sets the
-colour): "process", "decision", "event", "store", "queue", "doc", "external", "state", "final",
-then "focus", "risk", "hold", "good", "check" or "out". For example "event risk" or "queue hold".
+colour): "process", "decision", "terminator", "io", "store", "queue", "doc", "external", "person",
+"state", then "focus", "risk", "hold", "good", "check" or "out". For example "terminator risk".
+
+The "notation" option names the standard a diagram follows ("flowchart", "dataflow", "state",
+"c4"; see PROFILES). build() then refuses shapes that notation does not have and warns about
+unlabelled arrows, so a diagram cannot quietly drift into an invented notation.
 
 Nothing here takes a coordinate. If a diagram looks wrong, change what it says (fewer boxes,
 shorter labels, a different grouping or direction), never where things sit.
@@ -48,23 +52,43 @@ PALETTE = {
     "risk": ("#F7D9E9", "#B5176E"),    # blocked, failed, lost, refused
     "hold": ("#E9E1F7", "#6B46C1"),    # waiting on a person, pending, needs review, stale
     "good": ("#D9F2DF", "#1F7A3A"),    # approved, succeeded
-    "out": ("#FFFFFF", "#000000"),     # neutral (default colour of event)
+    "out": ("#FFFFFF", "#000000"),     # neutral (default colour of terminator)
 }
-# kind -> (D2 shape, default colour, extra style). The shapes follow the usual conventions: flowchart
-# (process rectangle, decision diamond, terminator oval, document), data-flow / architecture (cylinder
-# store, queue, square external party) and UML state machines (rounded state, double-border final state).
+# kind -> (D2 shape, default colour, extra style). Where a standard defines the symbol, the shape
+# follows it: ISO 5807 / ANSI X3.5 flowcharts (process rectangle, decision diamond, terminator with
+# rounded ends, input/output parallelogram, document, disk cylinder for stored data), data-flow
+# diagrams (process, store, external entity) and UML 2.5.1 state machines (rounded state, filled
+# initial dot, bullseye final marker; see initial() and final_marker()). Conventions, not standards:
+# the horizontal cylinder for a queue or topic, C4's person shape, and every colour.
 KINDS = {
-    "process":  ("rectangle", "step", "border-radius: 6; "),
-    "decision": ("diamond", "check", ""),
-    "event":    ("oval", "out", ""),
-    "store":    ("cylinder", "store", ""),
-    "queue":    ("queue", "store", ""),
-    "doc":      ("document", "store", ""),
-    "external": ("rectangle", "focus", "border-radius: 0; "),
-    "state":    ("rectangle", "step", "border-radius: 22; "),
-    "final":    ("rectangle", "out", "border-radius: 22; double-border: true; "),
+    "process":    ("rectangle", "step", "border-radius: 6; "),
+    "decision":   ("diamond", "check", ""),
+    "terminator": ("rectangle", "out", "border-radius: 999; "),   # D2's "oval" is an ellipse, not this
+    "io":         ("parallelogram", "store", ""),
+    "store":      ("cylinder", "store", ""),
+    "queue":      ("queue", "store", ""),
+    "doc":        ("document", "store", ""),
+    "external":   ("rectangle", "focus", "border-radius: 0; "),
+    "person":     ("c4-person", "focus", ""),
+    "state":      ("rectangle", "step", "border-radius: 22; "),
+    "final":      ("rectangle", "out", "border-radius: 22; double-border: true; "),  # old; use final_marker()
 }
-ALIASES = {"step": "process", "ask": "decision"}   # names used by earlier versions of the kit
+# names used by earlier versions of the kit; "event" drew an ellipse and meant several things
+ALIASES = {"step": "process", "ask": "decision", "event": "terminator"}
+MARKERS = ("initial", "end")   # UML pseudostates, drawn by initial() and final_marker()
+
+# The standard each notation follows, the kinds it has, and what build() checks.
+PROFILES = {
+    "flowchart": {"standard": "ISO 5807 / ANSI X3.5 flowchart", "title": "Flowchart: ",
+                  "kinds": {"terminator", "process", "decision", "io", "doc", "store"}, "label_all": False},
+    "dataflow": {"standard": "data-flow diagram (Yourdon/DeMarco, Gane & Sarson)", "title": "Data flow: ",
+                 "kinds": {"process", "store", "queue", "doc", "external", "person"}, "label_all": True,
+                 "max_process": 6},
+    "state": {"standard": "UML 2.5.1 state machine", "title": "State machine: ",
+              "kinds": {"state", "decision", "initial", "end"}, "label_all": True},
+    "c4": {"standard": "C4 model (system context / container)", "title": "",
+           "kinds": {"person", "external", "process", "store", "queue"}, "label_all": True},
+}
 TONES = ("focus", "risk", "hold", "good", "check", "out")
 # D2 keywords that cannot be used as ids ("link" bit us once).
 RESERVED = {"link", "label", "shape", "style", "class", "classes", "near", "width", "height", "icon", "tooltip",
@@ -91,6 +115,7 @@ classes: {{
 {kinds}
 {tones}
   initial: {{shape: circle; width: 18; height: 18; style: {{fill: "#000000"; stroke: "#000000"}}}}
+  end: {{shape: text; style: {{font-size: 30; font-color: "#000000"}}}}
   blank: {{style: {{opacity: 0}}}}
   note:  {{shape: text; style: {{font-color: "#4A5560"; font-size: 15; bold: false}}}}
   keybox: {{style: {{fill: transparent; stroke-width: 0; font-size: 8}}}}
@@ -116,9 +141,9 @@ def _id(i):
 
 
 def _cls(spec):
-    """'store' -> store; 'event risk' -> [event; risk]; 'risk' alone -> [process; risk]."""
+    """'store' -> store; 'terminator risk' -> [terminator; risk]; 'risk' alone -> [process; risk]."""
     words = [ALIASES.get(w, w) for w in (spec or "process").split()]
-    kinds = [w for w in words if w in KINDS or w in ("blank", "note", "initial")]
+    kinds = [w for w in words if w in KINDS or w in ("blank", "note", *MARKERS)]
     tones = [w for w in words if w in TONES]
     unknown = set(words) - set(kinds) - set(tones)
     if unknown or len(kinds) > 1:
@@ -127,23 +152,39 @@ def _cls(spec):
     return both[0] if len(both) == 1 else "[" + "; ".join(both) + "]"
 
 
+def _size(cls, *text):
+    """D2 sizes a person's head to its width, so a long label gives a giant head that stretches its
+    whole grid row. Give it a fixed size and keep its label short (about 14 characters a line)."""
+    if "person" not in _cls(cls):
+        return ""
+    return f"; width: {max(150, 8 * max(len(t or '') for t in text) + 40)}; height: 110"
+
+
 def node(i, title, sub=None, cls="process"):
     """A node with a short bold name and, optionally, one short second line.
-    cls is a kind, optionally followed by a status: "process", "store", "event risk", "queue hold"."""
+    cls is a kind, optionally followed by a status: "process", "store", "terminator risk", "queue hold"."""
+    size = _size(cls, title, sub)
     if not MARKDOWN or "decision" in _cls(cls):  # a question reads as one centred sentence, wrapped over two lines
-        return f"{_id(i)}: {q(title + (chr(10) + sub if sub else ''))} {{class: {_cls(cls)}}}"
+        return f"{_id(i)}: {q(title + (chr(10) + sub if sub else ''))} {{class: {_cls(cls)}{size}}}"
     body = f"**{title}**  \n{sub}" if sub else f"**{title}**"
-    return f"{_id(i)}: {{\n  class: {_cls(cls)}\n  label: |md\n{body}\n|\n}}"
+    return f"{_id(i)}: {{\n  class: {_cls(cls)}{size.replace('; ', chr(10) + '  ')}\n  label: |md\n{body}\n|\n}}"
 
 
 def plain(i, title, cls="process"):
     """A one-line node (use inside grids, or for 'blank' spacer cells with an empty title)."""
-    return f"{_id(i)}: {q(title)} {{class: {_cls(cls)}}}"
+    return f"{_id(i)}: {q(title)} {{class: {_cls(cls)}{_size(cls, title)}}}"
 
 
 def initial(target, i="d2kit_start"):
     """The UML initial marker: a small black dot with an arrow to the state where things begin."""
     return f'{i}: "" {{class: initial}}\n{i} -> {target}: {{class: flow}}'
+
+
+def final_marker(source, trigger=None, i=None):
+    """The UML final marker (a bullseye) with an arrow from the last state. A named end state such
+    as "Published" stays an ordinary state; this marker after it says the machine stops there."""
+    i = i or f"d2kit_end_{source.replace('.', '_')}"
+    return f'{i}: "◉" {{class: end}}\n{link(source, i, trigger)}'
 
 
 def link(a, b, text=None, cls="flow"):
@@ -218,7 +259,7 @@ EDGE_SAMPLES = {"flow": ("——▶", "out"), "warn": ("——▶", "risk"), "st
 def key_block(items, arrows=None, note=None, at="below", per_row=3, palette=None):
     """A boxed legend: a small sample of each shape or arrow with its meaning beside it.
 
-    items:  [(cls, text), ...] where cls is what you pass to node() ("store", "event risk").
+    items:  [(cls, text), ...] where cls is what you pass to node() ("store", "terminator risk").
     arrows: [(link class, text), ...] e.g. [("warn", "leaves the main path"), ("dashed", "timer")].
     note:   one more line of plain text, if something does not fit either list.
     at:     "right" stacks the entries in one column beside the diagram (for tall diagrams);
@@ -229,11 +270,16 @@ def key_block(items, arrows=None, note=None, at="below", per_row=3, palette=None
         words = [ALIASES.get(w, w) for w in cls.split()]
         kind = next((w for w in words if w in KINDS), "process")
         # D2 draws a cylinder's lid at a fixed size, so below these sizes it turns into a blob
-        w, h = {"store": (50, 58), "queue": (84, 34), "doc": (46, 30)}.get(kind, (40, 24))
-        if "initial" in words:  # a grid cell stretches a shape to the column width, so draw the dot as a glyph
-            cells += [f'  s{n}: "●" {{shape: text; style: {{font-size: 20; font-color: "#000000"}}}}', (n, text)]
+        w, h = {"store": (50, 58), "queue": (84, 34), "doc": (46, 30), "io": (50, 26)}.get(kind, (56, 34))
+        marker = next((w for w in words if w in MARKERS), None)
+        if marker:  # a grid cell stretches a shape to the column width, so draw the markers as glyphs
+            glyph, size = {"initial": ("●", 20), "end": ("◉", 24)}[marker]
+            cells += [f'  s{n}: "{glyph}" {{shape: text; style: {{font-size: {size}; font-color: "#000000"}}}}', (n, text)]
             continue
         size = f"width: {w}; height: {h}"
+        if kind == "person":  # D2's person shape has a minimum width, so a grid cell turns it into a blob
+            cells += [f'  s{n}: "👤" {{shape: text; style: {{font-size: 22}}}}', (n, text)]
+            continue
         cells += [f'  s{n}: "" {{class: {_cls(cls)}; {size}; style.stroke-width: 1}}', (n, text)]
     for n, (cls, text) in enumerate(arrows or []):
         glyph, colour = EDGE_SAMPLES.get(cls, EDGE_SAMPLES["flow"])
@@ -284,6 +330,40 @@ def _extras(opts, key_at, per_row, palette):
     return "\n" + "\n".join(extra)
 
 
+def check_notation(body, notation):
+    """Check generated D2 against a notation profile. Returns (errors, warnings).
+    Errors: a shape the notation does not have. Warnings: unlabelled arrows where the notation
+    labels every one, and more processes on one data-flow diagram than a reader can hold."""
+    prof = PROFILES[notation]
+    used, processes, errors, warnings = {}, 0, [], []
+    lines = body.splitlines()
+    for n, ln in enumerate(lines):
+        if "->" in ln:
+            continue
+        m = re.search(r"class: (\[[^\]]+\]|[\w-]+)", ln)
+        if not m:
+            continue
+        words = m.group(1).strip("[]").replace(";", " ").split()
+        for w in words:
+            if w in KINDS or w in MARKERS:
+                owner = (ln.split(":")[0] if not ln.strip().startswith("class:") else lines[n - 1].split(":")[0]).strip()
+                used.setdefault(w, owner)
+                processes += w == "process"
+    for kind, example in used.items():
+        if kind not in prof["kinds"]:
+            errors.append(f"'{kind}' (e.g. {example}) is not part of a {prof['standard']}; "
+                          f"use one of: {', '.join(sorted(prof['kinds']))}")
+    if prof.get("label_all"):
+        bare = [ln.strip() for ln in lines if re.search(r"->\s*[\w.]+\s*:\s*\{", ln)
+                and "opacity: 0" not in ln and "d2kit_start" not in ln and "d2kit_end" not in ln]
+        if bare:
+            warnings.append(f"{len(bare)} unlabelled arrow(s), e.g. {bare[0].split(':')[0]}")
+    if prof.get("max_process") and processes > prof["max_process"]:
+        warnings.append(f"{processes} processes; a {prof['standard']} keeps about {prof['max_process']} "
+                        "per diagram: split it into levels")
+    return errors, warnings
+
+
 def _shape_penalty(w, h):
     """0 for a comfortable proportion; grows as the image becomes a flat strip or a thin tower."""
     ratio = w / h
@@ -306,6 +386,9 @@ def build(diagrams, out_dir, src_dir=None, page_width=1180, names=None, palette=
       "key_at": "right" | "below"   overrides that choice
       "engine": "elk" (default; straight, right-angled arrows) or "dagre" (curved arrows; better
                 for graphs with loops such as state machines)
+      "notation": "flowchart" | "dataflow" | "state" | "c4"   the standard the diagram follows:
+                shapes outside it fail the build, unlabelled arrows are reported, and the title
+                gets the notation's prefix ("Data flow: ...") unless it already names it
     plain_labels=True writes plain SVG text instead of HTML labels."""
     global MARKDOWN
     MARKDOWN = not plain_labels
@@ -316,6 +399,17 @@ def build(diagrams, out_dir, src_dir=None, page_width=1180, names=None, palette=
     src_dir.mkdir(parents=True, exist_ok=True)
     for name in names or list(diagrams):
         fn, directions, opts = _spec(diagrams[name])
+        notes = []
+        if opts.get("notation"):
+            prof = PROFILES[opts["notation"]]
+            errors, notes = check_notation(fn(directions[0]), opts["notation"])
+            if errors:
+                ok = False
+                print(f"[{name}] FAILED notation {opts['notation']}:\n  " + "\n  ".join(errors))
+                continue
+            word = prof["title"].split(":")[0].lower()
+            if opts.get("title") and prof["title"] and word not in opts["title"].lower():
+                opts = {**opts, "title": prof["title"] + opts["title"]}
         engine = opts.get("engine", "elk")
         hd = head(palette).replace("layout-engine: elk", f"layout-engine: {engine}")
         src, svg, best = src_dir / f"{name}.d2", out / f"{name}.svg", None
@@ -347,6 +441,7 @@ def build(diagrams, out_dir, src_dir=None, page_width=1180, names=None, palette=
             fits += "" if scale >= min_scale else "  TEXT TOO SMALL AT PAGE WIDTH: simplify or split"
             fits += "" if best[3] * scale <= max_height else f"  TALLER THAN {max_height}: merge steps or split"
             fits += "" if not best[0][1] else ("  FLAT STRIP" if best[2] > best[3] else "  THIN TOWER") + ": try the other direction or engine"
+            fits += "".join(f"  NOTATION: {w}" for w in notes)
             print(f"[{name}] ok  direction={best[1] or 'grid'}  {best[2]:.0f} x {best[3]:.0f}{fits}")
         except RuntimeError as e:
             ok = False

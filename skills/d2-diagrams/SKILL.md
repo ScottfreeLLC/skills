@@ -15,11 +15,16 @@ engine, and looking at every image before showing it.
 
 Two things make a reader trust a diagram at first glance, and a diagram that builds cleanly can
 still miss both. First, **standard notation**: a diamond is a decision, a cylinder is stored data,
-an oval is an event. A reader who has seen any flowchart already knows these, so the shapes tell
+a box with rounded ends is where a flowchart starts or stops. A reader who has seen any flowchart already knows these, so the shapes tell
 them what kind of thing each node is before they read a word. Rounded boxes that differ only in
 colour make them ask "which of these is data and which is a process?". Second, **a main path the
 eye can follow**: it starts where reading starts (top or left) and runs in one line, with
 exceptions hanging off it.
+
+Both come from using a **standard notation for each kind of diagram** rather than one invented
+vocabulary for all of them: ISO 5807 flowchart symbols for decision logic, data-flow diagram rules
+for pipelines, UML for state machines and sequences, the C4 model for architecture. No single
+template covers every type, but each type has one, and the kit enforces it (see "Notation").
 
 Three more things decide whether a reader finds the diagram useful. **Arrows say what moves**: in
 a data flow the arrows are the data, so each one names what is passed ("raw events", "Parquet
@@ -45,16 +50,20 @@ the diagram has space for it.
 4. **Write a build script** next to the output (for example `docs/diagrams/src/build.py`). Put the
    kit's absolute path (printed in step 1) on `sys.path`; the relative path in the examples only
    works inside the skill folder.
-5. **Name the kind of each node and the main path** before writing any D2. For every node: is it
-   a process, a decision, an event, stored data, a queue, a state, or something outside the
-   system? Which sequence of nodes is the normal case? See "Notation" and "The main path".
+5. **Pick the notation, then name the kind of each node and the main path** before writing any
+   D2. Which question does the diagram answer: what decides (flowchart), what data moves
+   (data flow), what states a thing goes through (state machine), what the system is made of (C4)?
+   Then for every node: which of that notation's kinds is it? Which sequence of nodes is the
+   normal case? See "Notation" and "The main path".
 6. **Decide where the image will live.** On a page you control, the text around it carries the
    title and key. Anywhere else (wiki, slide, email, README) the image stands alone, so give it a
    title and key inside the image with the `options` shown below.
 7. **Build, then look at every PNG** with the Read tool. A successful build only means D2 ran.
-   Ask of each image: could a newcomer say what kind of thing every node is from its shape and
-   the key? Does the main path start at the top or left and run straight? Does every arrow say
-   what moves or what triggers it? Is the spacing even, or is one direction cramped?
+   Ask of each image the C4 review questions, which apply to every notation: does it have a title
+   naming the type and scope? A key explaining every shape, colour, border and line style used?
+   Could a newcomer say what kind of thing every node is? Does every arrow say what moves or what
+   triggers it, in the direction it points? Then: does the main path start at the top or left and
+   run straight? Is the spacing even, or is one direction cramped?
 8. **Fix by changing what the diagram says**, never where things sit. See "When it looks wrong".
 9. **Report** the files, the one-line rebuild command, and anything you could not verify.
 
@@ -69,16 +78,18 @@ from d2kit import node, plain, link, group, grid, spine, initial, build
 def flow(direction):
     return "\n".join([
         f"direction: {direction}",
-        node("api", "API", "validates the request", "process"),
+        node("shop", "Web shop", "where orders come from", "external"),
+        node("api", "Order API", "validates the order", "process"),
         node("db", "Orders", "Postgres", "store"),
-        node("bad", "Request invalid", "caller gets a 400", "event risk"),
-        link("api", "db", "valid order"), link("api", "bad", "invalid order", "warn"),
+        link("shop", "api", "order request"), link("api", "db", "valid order"),
+        link("api", "shop", "refusal reason", "warn"),
     ])
 
 build({"1-flow": (flow, ("down", "right"), {
-    "title": "How an order is saved",                      # optional: for stand-alone images
-    "key": [("process", "our code"), ("store", "stored data"), ("event risk", "request refused")],
-    "arrows": [("flow", "main path"), ("warn", "leaves the main path")],
+    "notation": "dataflow",                                # the standard this diagram follows
+    "title": "How an order is saved",                      # becomes "Data flow: How an order is saved"
+    "key": [("external", "system outside ours"), ("process", "our code"), ("store", "stored data")],
+    "arrows": [("flow", "data on the main path"), ("warn", "data sent back")],
 })}, out_dir="docs/diagrams")
 ```
 
@@ -89,27 +100,57 @@ carries meaning. It warns when the text would be too small at page width, when t
 taller than 2000 px, or when the best layout is still a strip or a tower; each means "simplify,
 split, or try the other engine". A grid diagram can be a function with no argument.
 
-Options: `title`, `subtitle`, `key`, `arrows`, `note`, `key_at` (`"right"` or `"below"`; by default
+Options: `notation` (see below), `title`, `subtitle`, `key`, `arrows`, `note`, `key_at` (`"right"` or `"below"`; by default
 the key goes beside a tall diagram when the page has room and below otherwise), and `engine`
 (`"elk"`, the default, draws right-angled arrows and suits flows and trees; `"dagre"` draws curved
 arrows and spaces graphs with loops, such as state machines, far more evenly).
 
-### Notation: shape is the kind of thing, colour is its status
+### Notation: pick the standard, then the shapes
 
-The class you pass to `node` is a kind, optionally followed by a status: `"store"`,
-`"event risk"`, `"queue hold"`. The kinds follow the conventions readers already know (flowchart
-symbols, data-flow and architecture diagrams, UML state machines):
+Set `"notation"` on every diagram. The build then fails on a shape that notation does not have
+(a decision diamond in a data flow, a terminator in a C4 diagram), warns about unlabelled arrows
+and about more than six processes on one data flow, and prefixes the title with the notation
+("Data flow: ...") unless it already names it.
 
-| Kind | Shape | Use it for |
-|---|---|---|
-| `process` | rectangle | work the system does: a service, job, step, function |
-| `decision` | diamond | a yes/no question or a guard |
-| `event` | oval | something that happens: the start, an end or outcome, a trigger, a failure |
-| `store` | cylinder | data at rest: database, table, bucket, file store |
-| `queue` | horizontal cylinder | data in transit: topic, stream, queue |
-| `doc` | document | a file, report or message someone reads |
-| `external` | square-cornered box | a person, team or system outside the thing being described |
-| `state` / `final` | rounded box / double border | a state in a state machine / an end state |
+| Notation | Answers | Kinds it allows | Arrow labels | Standard |
+|---|---|---|---|---|
+| `flowchart` | what decides? | `terminator`, `process`, `decision`, `io`, `doc`, `store` | yes / no on each decision exit | ISO 5807 (ANSI X3.5 symbols) |
+| `dataflow` | what data moves? | `external`, `person`, `process`, `store`, `queue`, `doc` | every arrow names its data | data-flow diagram rules (Yourdon/DeMarco, Gane & Sarson) |
+| `state` | what states does it pass through? | `state`, `initial()`, `final_marker()`, `decision` (choice) | the trigger, `trigger [guard] / effect` | UML 2.5.1 state machine |
+| `c4` | what is the system made of? | `person`, `external`, `process`, `store`, `queue` | intent plus protocol, one direction | C4 model (system context, container) |
+
+For a request flowing between parts over time, use D2's own `shape: sequence_diagram` (UML
+sequence notation) instead of the kit's nodes. For a slide-sized overview there is no standard;
+use a C4 system-context diagram (the system as one box, people and outside systems around it, about
+5–9 elements) or a top-level data flow.
+
+The kinds and the symbol each draws:
+
+| Kind | Shape | Use it for | Source |
+|---|---|---|---|
+| `process` | rectangle | work the system does: a service, job, step, function | flowchart, data flow |
+| `decision` | diamond | a yes/no question; in UML a choice | flowchart, UML |
+| `terminator` | box with fully rounded ends | the start and each end of a flowchart, named for the outcome | ISO 5807 |
+| `io` | parallelogram | data read in or written out in a flowchart | ISO 5807 |
+| `store` | cylinder | data at rest: database, table, bucket, file store | flowchart (disk), BPMN, C4 |
+| `queue` | horizontal cylinder | data in transit: topic, stream, queue | convention: no standard has a queue symbol; say so in the key |
+| `doc` | document | a file, report or message someone reads | flowchart |
+| `external` | square-cornered box | a person, team or system outside the thing described | data flow |
+| `person` | head and shoulders | a person or role, in C4 diagrams; keep the label short | C4 convention |
+| `state` | rounded box | a state, including named end states ("Published") | UML |
+| `initial("first")` / `final_marker("last")` | black dot / bullseye | where the machine starts / stops | UML |
+
+The old `event` kind (an ellipse used for starts, ends, triggers and failures alike) now draws a
+terminator. Do not use it for things that happen mid-flow: in a flowchart that is a process step;
+in a data flow it is a labelled arrow or an external entity that receives the data.
+
+In C4 diagrams put the element's type and technology on the second line, in brackets:
+`node("api", "Order API", "[Container: Python] validates orders", "process")`. C4 also asks for a
+technology on arrows between containers ("orders, JSON over HTTPS").
+
+**Colour is not part of any of these standards.** UML assumes black on white; C4 and BPMN allow any
+colour scheme as long as it is explained. So a status colour is a project convention: list it in the
+key, and make the status readable without colour too (the label says "Refused", "Needs review").
 
 | Status | Meaning |
 |---|---|
@@ -119,18 +160,15 @@ symbols, data-flow and architecture diagrams, UML state machines):
 | `good` | approved, succeeded |
 | `focus` | the thing being followed or tested |
 
-Pick the kind by asking what the node is, not how important it is. "Batch over 1 MB is rejected"
-is something that happens, so it is an `event` (with status `risk`), not a process. A Kafka topic
-is a `queue`, a warehouse table is a `store`, the team reading a dashboard is `external`. If a
-diagram ends up with only one shape, check whether data and events have been folded into process
-boxes; pulling them out is usually what makes the picture make sense.
+Pick the kind by asking what the node is, not how important it is. A Kafka topic is a `queue`, a
+warehouse table is a `store`, the team reading a dashboard is `external`. If a diagram ends up with
+only one shape, data and outside parties have probably been folded into process boxes.
 
-The key explains every shape, status colour and arrow style the diagram uses, because a
+The key explains every shape, status colour, border and arrow style the diagram uses, because a
 convention only helps readers who can check it. In `key`, list each kind once with a plain-words
 label ("Kafka topic", "service or job"), then each status. In `arrows`, list each arrow style used
 (`[("flow", "moved by support staff"), ("dashed", "automatic timer")]`). The kit draws it as one
-boxed legend with a small sample beside each line. A key that explains colours only leaves the
-shapes as decoration; a loose row of labels under the picture reads as an afterthought.
+boxed legend with a small sample beside each line.
 
 Arrow classes: `flow` (default), `warn` (leaves the main path), `ref` (lookup, dotted), `strong`
 (the link that matters), `dashed` (automatic, timed, or optional), `accent` (a second actor). Pass
@@ -147,8 +185,8 @@ MAIN = [("api", "Order API", "validates the order", "process"),
         ("queue", "orders", "queue, kept 7 days", "queue"),
         ("worker", "Fulfilment worker", "charges the card", "process")]
 
-SIDE = {"api": [("invalid", "Order refused", "shopper is told why", "event risk", "invalid order")],
-        "worker": [("declined", "Card declined", "retried for 3 days", "event hold", "failed charge")]}
+SIDE = {"api": [("shopper", "Shopper", "told why it was refused", "external", "refusal reason")],
+        "worker": [("bank", "Card processor", "outside our system", "external", "charge request")]}
 CARRIES = ["validated order", "order message"]         # one label per main arrow: what is passed
 
 def orders(direction):
@@ -156,8 +194,8 @@ def orders(direction):
 ```
 
 `spine` draws MAIN as a straight line and each SIDE chain beside the step that causes it.
-`carries` names what moves along each main arrow, and the fifth item of a SIDE entry names what
-leaves the path there. Use it
+`carries` names what moves along each main arrow, and the fifth item of a SIDE entry names the
+data that leaves the path there. Use it
 whenever a flow is one sequence plus exceptions (pipelines, request paths, run order with failure
 points). It suits up to about twelve main steps going down or six going right. For flows that
 truly branch and rejoin (decision trees, state machines) use `direction` with `node` and `link`,
@@ -184,21 +222,27 @@ exactly as authoritative as a documented one, and the reader cannot tell them ap
 
 ### Choosing a structure for the content
 
-- **Flow or pipeline:** `spine` when it is one sequence with exceptions. Alternate the kinds
-  honestly: process, then the queue or store it writes to, then the next process. Without side
-  branches, `direction` plus `group` for stages also works; merge steps until one direction is at
-  most about eight layers deep.
-- **Decision logic (flowchart):** an `event` oval for the start, `decision` diamonds with yes/no
-  arrows, and an `event` oval for each end, coloured `good`, `hold` or `risk`. Give every exit its
+- **Flow or pipeline (`dataflow`):** `spine` when it is one sequence with exceptions. Alternate the
+  kinds honestly: process, then the queue or store it writes to, then the next process; outside
+  systems and people are `external`. Data leaving the path goes to a store or an external entity,
+  never to an outcome box. No decisions: if the reader needs the logic, draw a separate flowchart.
+  At most about six processes per diagram; for more, draw a top-level diagram and one diagram per
+  part ("levels").
+- **Decision logic (`flowchart`):** a `terminator` for the start, `decision` diamonds with yes/no
+  arrows, and a `terminator` for each end, coloured `good`, `hold` or `risk`. Give every exit its
   own outcome with the reason on the second line; one shared outcome causes long crossing arrows.
   Diamonds grow fast with text: keep questions under about 20 characters per line and put the
   rest on the second line.
-- **State machine (UML):** generate from the transition table. `state` for each state, `final` for
-  end states, `initial("first_state")` for the black start dot (give it a key entry too:
-  `("initial", "where it starts")`), and the trigger on every arrow.
+- **State machine (`state`):** generate from the transition table. `state` for each state,
+  `initial("first_state")` for the black start dot and `final_marker("last_state")` for the
+  bullseye after each end state (key entries: `("initial", "where it starts")`,
+  `("end", "where it stops")`), and the trigger on every arrow.
   Set `"engine": "dagre"` and offer `("down", "right")`: state machines have loops, and the default
   engine squeezes their back-arrows into tight parallel tracks, while dagre spaces them evenly
   with curved arrows.
+- **Architecture (`c4`):** a system-context diagram (people, the system, outside systems) or a
+  container diagram (the system's apps and data stores). Title it "System context diagram for X"
+  or "Container diagram for X"; types and technologies in brackets on the second line.
 - **Schema or "what links to what":** generate from the code; merge arrows that share both ends and
   kind into one arrow with a two-line label.
 - **A list of parallel routes or variants:** one small `group` per route, laid out in a grid
@@ -219,6 +263,8 @@ exactly as authoritative as a documented one, and the reader cannot tell them ap
 | Starts in a corner and steps sideways | Side branches are pulling the main path; use `spine` |
 | Tall and thin, arrows bunched on one axis | Offer `"right"` as well, or `"engine": "dagre"` |
 | Every node is the same shape | Kinds were not assigned; see "Notation" |
+| Build fails: "'decision' is not part of a data-flow diagram" | The diagram mixes notations: move the logic to a flowchart, or pick the notation that fits the question |
+| A person's head is huge and stretches its row | Shorten the person's label (about 14 characters a line), or use `external` |
 | Tangle around one box | That box has too many links; merge parallel arrows or split the diagram |
 | Long arrows to a shared outcome | One outcome box per exit |
 | Side-branch boxes sink far from their source | Drop the groups, or move the box into the group |

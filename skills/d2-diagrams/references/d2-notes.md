@@ -38,7 +38,7 @@
   an 800 px diamond. Split the question over two lines (title and second line). Decision labels
   are plain centred text, not markdown, so both lines are bold.
 - **Several classes** on one node work as `class: [event; risk]`; later classes override earlier
-  ones. The kit writes this for `"event risk"`.
+  ones. The kit writes this for `"terminator risk"`.
 - **Putting the main path in a container** to keep it together does not work: ELK routes every
   arrow that crosses the container border around the outside and the result is far worse.
 - **State machines and other graphs with loops**: ELK routes every back-arrow as a right-angled
@@ -52,6 +52,19 @@
   are text glyphs: a real arrow inside a grid cell stretches to fill the cell.
 - **Edge labels between grid cells** (used by `spine(carries=...)`) are drawn on the straight
   arrow; the gap between cells must be wide enough for the label, which `spine` sets.
+- **Shapes that look standard but are not**: D2's `oval` is an ellipse; the flowchart terminator
+  is a box with fully rounded ends, which the kit draws as a rectangle with `border-radius: 999`.
+  D2's `step` is a chevron, not the flowchart's predefined-process box. A `double-border` circle
+  draws a ring, not the UML bullseye; the kit's `final_marker()` uses the "◉" glyph, which works as
+  an arrow target.
+- **`c4-person`** sizes its head to its width: a long label gives a giant head that stretches
+  its whole grid row. The kit fixes the size (150 x 110 for short labels). D2 also has a minimum
+  width for it, so in the key it is drawn as a glyph.
+- **C4 support** (D2 0.7+): `shape: c4-person`, theme 303 ("C4"), `d2-legend`, and layers for
+  zooming between levels. **Crow's-foot ER**: `sql_table` with `cf-one`, `cf-many`,
+  `cf-one-required`, `cf-many-required` arrowheads.
+- **Grid rows share a height**: a cylinder sample (D2 draws it at least about 58 px tall) makes
+  every other sample in that key row as tall.
 - **ELK options**: D2 exposes only `algorithm`, `nodeNodeBetweenLayers`, `edgeNodeBetweenLayers`,
   `padding` and `nodeSelfLoop`. There is no knob for "keep this path straight"; use `spine`.
 
