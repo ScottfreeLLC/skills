@@ -12,6 +12,12 @@
       "description": "Senior-level AI engineering standards for retrieval, agents, evals, context engineering, and production AI systems.",
       "strict": false,
       "skills": ["skills/ai-engineer"]
+    },
+    {
+      "name": "d2-diagrams",
+      "description": "Technical diagrams as SVG and PNG with D2 automatic layout: standard notation, a straight main path, labelled arrows and a boxed key. Needs the d2 CLI.",
+      "strict": false,
+      "skills": ["skills/d2-diagrams"]
     }
   ]
 }

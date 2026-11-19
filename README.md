@@ -7,6 +7,7 @@ A collection of [Agent Skills](https://agentskills.io/specification) for Claude 
 | Skill | Description |
 |---|---|
 | [ai-engineer](skills/ai-engineer/) | Senior-level AI engineering standards for retrieval, agents, evals, context engineering, and production AI systems |
+| [d2-diagrams](skills/d2-diagrams/) | Technical diagrams (flows, pipelines, decision trees, state machines, schemas) as SVG and PNG with D2 automatic layout, generated from code where possible |
 
 ## Installation
 
@@ -15,6 +16,7 @@ A collection of [Agent Skills](https://agentskills.io/specification) for Claude 
 ```bash
 /plugin marketplace add ScottfreeLLC/skills
 /plugin install ai-engineer@scottfree-skills
+/plugin install d2-diagrams@scottfree-skills
 ```
 
 ### Manual
